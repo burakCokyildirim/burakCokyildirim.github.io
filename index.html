@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clawde, a desktop pet for Claude Code</title>
+<meta name="description" content="A small pixel pet that floats above your windows and acts out what your Claude Code sessions are doing, with a menu bar list of every one of them. Free and open source for macOS.">
+<meta property="og:title" content="Clawde">
+<meta property="og:description" content="A small pixel pet that acts out what your Claude Code sessions are doing. Free and open source for macOS.">
+<meta property="og:image" content="https://burakcokyildirim.github.io/assets/og.png">
+<meta property="og:url" content="https://burakcokyildirim.github.io/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Pixelify+Sans:wght@500;700&display=swap">
+<style>
+  :root {
+    /* The app's own palette: the icon's ink, the tiles' graphite, Claudie's orange and white. */
+    --ink: #1c1f26;
+    --ink-deep: #16181e;
+    --graphite: #2b2f36;
+    --graphite-edge: #3a3f48;
+    --paper: #f4f1ec;
+    --muted: #a3a6ad;
+    --faint: #6f737b;
+    --claudie: #d1684a;
+    --claudie-bright: #e27a5b;
+
+    --font-pixel: "Pixelify Sans", ui-monospace, "SF Mono", Menlo, monospace;
+    --font-body: "Geist", ui-sans-serif, -apple-system, "Helvetica Neue", sans-serif;
+    --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    --text-base: clamp(1rem, 0.95rem + 0.2vw, 1.0625rem);
+    --text-lede: clamp(1.25rem, 1.05rem + 0.9vw, 1.6rem);
+    --text-h2: clamp(1.5rem, 1.2rem + 1.2vw, 2.1rem);
+    --space-section: clamp(4rem, 3rem + 4vw, 7rem);
+    --radius-tile: 18px;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  * { box-sizing: border-box; }
+  html { background: var(--ink); color-scheme: dark; }
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font: 400 var(--text-base)/1.6 var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; height: auto; display: block; }
+  a { color: var(--claudie-bright); text-underline-offset: 3px; }
+  a:hover { color: var(--paper); }
+  :focus-visible { outline: 2px solid var(--claudie-bright); outline-offset: 3px; border-radius: 6px; }
+
+  .wrap { width: min(1080px, 100%); margin-inline: auto; padding-inline: 20px; }
+
+  /* Hero: words on the left, the pet at work on the right. */
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: clamp(2rem, 5vw, 4.5rem);
+    align-items: center;
+    padding-block: clamp(3rem, 6vw, 5.5rem) var(--space-section);
+  }
+  .wordmark {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 0 1.4rem;
+    font: 700 clamp(2.4rem, 1.8rem + 2.6vw, 3.6rem)/1 var(--font-pixel);
+    letter-spacing: 0.01em;
+  }
+  .wordmark img { width: 64px; height: 64px; border-radius: 15px; }
+  .lede {
+    margin: 0 0 1.1rem;
+    font-size: var(--text-lede); line-height: 1.3; font-weight: 500;
+    text-wrap: balance; max-width: 30ch;
+  }
+  .hero p.body { color: var(--muted); max-width: 52ch; margin: 0 0 2rem; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .button {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 12px 20px; border-radius: 12px;
+    background: var(--claudie); color: #fff; text-decoration: none; font-weight: 600;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.18) inset, 0 8px 24px -10px rgba(209,104,74,0.8);
+    transition: transform 160ms var(--ease), background 160ms var(--ease);
+  }
+  .button:hover { background: var(--claudie-bright); color: #fff; transform: translateY(-1px); }
+  .button:active { transform: translateY(0); }
+  .brew {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 5px 5px 5px 14px; border-radius: 12px;
+    background: var(--graphite); border: 1px solid var(--graphite-edge);
+    font: 400 0.86rem/1 var(--font-mono); color: var(--paper);
+    max-width: 100%; min-width: 0;
+  }
+  /* Scrolls inside its own box on a narrow screen rather than widening the page. */
+  .brew code { min-width: 0; white-space: nowrap; overflow-x: auto; scrollbar-width: none; padding-block: 8px; }
+  .brew code::before { content: "$ "; color: var(--faint); }
+  .copy {
+    flex: none; border: 0; border-radius: 8px; cursor: pointer;
+    padding: 7px 10px; background: var(--graphite-edge); color: var(--paper);
+    font: 500 0.78rem/1 var(--font-body);
+    transition: background 160ms var(--ease);
+  }
+  .copy:hover { background: #4a505b; }
+  .meta {
+    margin: 1.4rem 0 0; padding: 0; list-style: none;
+    display: flex; flex-wrap: wrap; gap: 6px 18px;
+    color: var(--faint); font-size: 0.9rem;
+  }
+  .meta a { color: var(--muted); }
+
+  .stage {
+    position: relative; justify-self: end; width: min(100%, 492px);
+    border-radius: 22px; overflow: hidden;
+    box-shadow: 0 30px 80px -30px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06);
+  }
+
+  /* Sections */
+  section { padding-block: 0 var(--space-section); }
+  .eyebrow {
+    margin: 0 0 0.6rem;
+    font: 500 0.82rem/1 var(--font-pixel); letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--claudie-bright);
+  }
+  h2 { margin: 0 0 0.9rem; font-size: var(--text-h2); line-height: 1.15; font-weight: 600; text-wrap: balance; }
+  section > .wrap > p, .split p { color: var(--muted); max-width: 62ch; margin: 0 0 2rem; }
+
+  .tiles { display: grid; gap: 14px; }
+  .tiles.moods { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .tiles.cast { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .tiles figure { margin: 0; }
+  .tiles img {
+    width: 100%; border-radius: var(--radius-tile);
+    image-rendering: pixelated;
+    transition: transform 220ms var(--ease);
+  }
+  .tiles img:hover { transform: translateY(-3px); }
+  .cast figcaption { margin-top: 10px; color: var(--muted); font-size: 0.92rem; }
+  .cast figcaption b { color: var(--paper); font-weight: 600; }
+
+  .make {
+    margin-top: 28px; padding: 22px 24px;
+    border-radius: var(--radius-tile);
+    background: linear-gradient(180deg, rgba(209,104,74,0.12), rgba(209,104,74,0.04));
+    border: 1px solid rgba(209,104,74,0.28);
+  }
+  .make p { margin: 0; color: var(--muted); max-width: 70ch; }
+  .make p + p { margin-top: 8px; }
+  .make strong { color: var(--paper); }
+  code.inline { font-family: var(--font-mono); font-size: 0.92em; color: var(--paper); background: var(--graphite); padding: 2px 6px; border-radius: 6px; }
+
+  .split {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+    gap: clamp(2rem, 5vw, 4rem); align-items: center;
+  }
+  .split img { border-radius: 20px; width: 300px; justify-self: end; }
+
+  .how { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 0; }
+  .how div { padding: 22px; border-radius: var(--radius-tile); background: var(--graphite); }
+  .how dt { font-weight: 600; margin-bottom: 6px; }
+  .how dd { margin: 0; color: var(--muted); font-size: 0.95rem; }
+
+  .note { margin-top: 18px; color: var(--faint); font-size: 0.92rem; max-width: 70ch; }
+
+  footer {
+    border-top: 1px solid var(--graphite);
+    background: var(--ink-deep);
+    padding-block: 28px 40px;
+    color: var(--faint); font-size: 0.9rem;
+  }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+  footer p { margin: 0; }
+  footer a { color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: minmax(0, 1fr); }
+    .stage { justify-self: center; }
+    .tiles.moods { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .tiles.cast { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .split { grid-template-columns: minmax(0, 1fr); }
+    .split img { justify-self: start; }
+    .how { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+    .tiles img:hover, .button:hover { transform: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="wrap hero">
+    <div>
+      <h1 class="wordmark"><img src="assets/icon.png" width="64" height="64" alt="">Clawde</h1>
+      <p class="lede">A desktop pet that acts out your Claude Code sessions.</p>
+      <p class="body">Sessions run in windows you are not looking at. Clawde puts one small character above everything else, doing whatever the session that most wants you is doing: typing while it works, asking while it waits on you, dozing when there is nothing to say. Click it and you are in that session.</p>
+      <div class="actions">
+        <a class="button" href="https://github.com/burakCokyildirim/clawde/releases/latest">Download for macOS</a>
+        <span class="brew"><code id="brew">brew install --cask burakcokyildirim/tap/clawde</code><button class="copy" type="button" data-copy="brew">Copy</button></span>
+      </div>
+      <ul class="meta">
+        <li>Free and open source</li>
+        <li>macOS 15 or newer</li>
+        <li>Signed and notarized</li>
+        <li><a href="https://github.com/burakCokyildirim/clawde">Source on GitHub</a></li>
+      </ul>
+    </div>
+    <div class="stage">
+      <picture>
+        <source media="(prefers-reduced-motion: reduce)" srcset="assets/still/hero.png">
+        <img src="assets/hero.png" width="492" height="498" fetchpriority="high"
+             alt="The pet with its speech bubble open over three sessions. The pointer moves onto the waiting session and the pet waits with a question mark, then onto the working one and it pulls out a laptop and types.">
+      </picture>
+    </div>
+  </header>
+
+  <section aria-labelledby="moods">
+    <div class="wrap">
+      <p class="eyebrow">Six moods</p>
+      <h2 id="moods">It acts out the session</h2>
+      <p>Every mood has its own animation, with an entrance and an exit, so the laptop is never dropped in mid-air. The pet stands for the session that most wants you: one waiting on you first, then an answer nobody has read, then work in progress. It hops when a session takes up something new.</p>
+      <div class="tiles moods">
+        <figure><picture><source media="(prefers-reduced-motion: reduce)" srcset="assets/still/mood-active.png"><img src="assets/mood-active.png" width="240" height="240" loading="lazy" alt="Active: it pulls out a laptop and types"></picture></figure>
+        <figure><picture><source media="(prefers-reduced-motion: reduce)" srcset="assets/still/mood-waiting.png"><img src="assets/mood-waiting.png" width="240" height="240" loading="lazy" alt="Waiting: it writes a question mark over its head"></picture></figure>
+        <figure><picture><source media="(prefers-reduced-motion: reduce)" srcset="assets/still/mood-unread.png"><img src="assets/mood-unread.png" width="240" height="240" loading="lazy" alt="Unread: a speech bubble bobs beside its head"></picture></figure>
+        <figure><picture><source media="(prefers-reduced-motion: reduce)" srcset="assets/still/mood-compacting.png"><img src="assets/mood-compacting.png" width="240" height="240" loading="lazy" alt="Compacting: it squashes down and kicks up dust"></picture></figure>
+        <figure><picture><source media="(prefers-reduced-motion: reduce)" srcset="assets/still/mood-idle.png"><img src="assets/mood-idle.png" width="240" height="240" loading="lazy" alt="Idle: it dozes"></picture></figure>
+        <figure><picture><source media="(prefers-reduced-motion: reduce)" srcset="assets/still/mood-resting.png"><img src="assets/mood-resting.png" width="240" height="240" loading="lazy" alt="Resting: it blinks, with no session running"></picture></figure>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="cast">
+    <div class="wrap">
+      <p class="eyebrow">Four characters</p>
+      <h2 id="cast">Pick one, or draw your own</h2>
+      <p>Each is drawn frame by frame on a 20 &times; 16 canvas and scaled in whole points per pixel, so the art stays crisp at any size.</p>
+      <div class="tiles cast">
+        <figure><picture><source media="(prefers-reduced-motion: reduce)" srcset="assets/still/cast-claudie.png"><img src="assets/cast-claudie.png" width="272" height="272" loading="lazy" alt="Claudie pulling out a laptop to type"></picture><figcaption><b>Claudie</b> pulls out a laptop and gets to work.</figcaption></figure>
+        <figure><picture><source media="(prefers-reduced-motion: reduce)" srcset="assets/still/cast-nibble.png"><img src="assets/cast-nibble.png" width="272" height="272" loading="lazy" alt="Nibble, its eyes turning into see-sawing braces"></picture><figcaption><b>Nibble</b> thinks with its eyes.</figcaption></figure>
+        <figure><picture><source media="(prefers-reduced-motion: reduce)" srcset="assets/still/cast-quack.png"><img src="assets/cast-quack.png" width="272" height="272" loading="lazy" alt="Quack inspecting the work through a magnifying glass"></picture><figcaption><b>Quack</b> listens while you explain.</figcaption></figure>
+        <figure><picture><source media="(prefers-reduced-motion: reduce)" srcset="assets/still/cast-kernel.png"><img src="assets/cast-kernel.png" width="272" height="272" loading="lazy" alt="Kernel popping out tiles of code"></picture><figcaption><b>Kernel</b> pops out bits of program.</figcaption></figure>
+      </div>
+      <div class="make">
+        <p><strong>Make your own.</strong> A character is one Swift file of pixel art written as letters. Open the repository in Claude Code and run <code class="inline">/new-character</code>: it draws one with you, shows you every mood animated and wires it into the app.</p>
+        <p>A cat that walks across the keyboard, an octopus typing on four keyboards at once, a coffee mug that drains while the context compacts: <a href="https://github.com/burakCokyildirim/clawde/labels/character">a few are waiting for someone to draw them</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="list">
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">Menu bar</p>
+        <h2 id="list">Every session, one click away</h2>
+        <p>Hover the pet and a bubble lists every session that is doing something; the menu bar has all of them. Click one and Clawde brings it forward: the right tab in iTerm2, Terminal or Ghostty, the right window in VS Code, Xcode or a JetBrains IDE, the right conversation in the Claude desktop app.</p>
+      </div>
+      <img src="assets/menu-bar.png" width="300" height="299" loading="lazy" alt="The menu bar list with four sessions, waiting, unread, active and idle, and the day's usage bar underneath">
+    </div>
+  </section>
+
+  <section aria-labelledby="how">
+    <div class="wrap">
+      <p class="eyebrow">Under the hood</p>
+      <h2 id="how">How it knows</h2>
+      <dl class="how">
+        <div><dt>A small plugin</dt><dd>A Rust daemon per session reads its transcript and writes the state to a file beside it, and the app hears about every change at once.</dd></div>
+        <div><dt>Unread, for the desktop app</dt><dd>For sessions in the Claude desktop app it can tell when Claude has answered and you have not looked yet.</dd></div>
+        <div><dt>Next to nothing</dt><dd>No timer runs while the pet is hidden or covered, and with Reduce Motion on each mood holds a single still frame.</dd></div>
+      </dl>
+      <p class="note">On first launch Clawde offers to install its Claude Code plugin. Sessions report once they start again after that; <a href="https://github.com/burakCokyildirim/clawde#setting-the-plugin-up">the README</a> has the details, including the way in for the Claude desktop app.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>BSD 3-Clause. Grew out of <a href="https://github.com/gmr/claude-status">gmr/claude-status</a>. Not affiliated with Anthropic.</p>
+    <p><a href="https://github.com/burakCokyildirim/clawde">GitHub</a> &middot; <a href="https://github.com/burakCokyildirim/clawde/releases">Releases</a> &middot; <a href="https://github.com/burakCokyildirim/clawde/blob/main/CONTRIBUTING.md">Contributing</a></p>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll("[data-copy]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var text = document.getElementById(button.dataset.copy).textContent;
+      var done = function () {
+        button.textContent = "Copied";
+        setTimeout(function () { button.textContent = "Copy"; }, 1600);
+      };
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(done, function () { button.textContent = "Select it"; });
+      } else {
+        button.textContent = "Select it";
+      }
+    });
+  });
+</script>
+</body>
+</html>
